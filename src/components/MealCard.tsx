@@ -1,7 +1,23 @@
+import React from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "../theme/theme";
+import type { MealLite } from "../types/meal";
 
-export default function MealCard({ meal, onOpen, isFavorite, onToggleFavorite, compact }) {
+type Props = {
+  meal: MealLite;
+  onOpen: (id: string) => void;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+  compact?: boolean;
+};
+
+export default function MealCard({
+  meal,
+  onOpen,
+  isFavorite,
+  onToggleFavorite,
+  compact,
+}: Props) {
   return (
     <View style={[styles.wrap, compact && styles.wrapCompact]}>
       <Pressable
@@ -26,10 +42,7 @@ export default function MealCard({ meal, onOpen, isFavorite, onToggleFavorite, c
 
       <Pressable
         onPress={() => onToggleFavorite(meal.idMeal)}
-        style={({ pressed }) => [
-          styles.favBtn,
-          pressed && { transform: [{ scale: 0.95 }] },
-        ]}
+        style={({ pressed }) => [styles.favBtn, pressed && { transform: [{ scale: 0.95 }] }]}
         hitSlop={10}
       >
         <Text style={styles.favText}>{isFavorite ? "★" : "☆"}</Text>

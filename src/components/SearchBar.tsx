@@ -1,7 +1,15 @@
+import React from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { theme } from "../theme/theme";
 
-export default function SearchBar({ query, onQueryChange, onSearch, isSearching }) {
+type Props = {
+  query: string;
+  onQueryChange: (v: string) => void;
+  onSearch: () => void;
+  isSearching: boolean;
+};
+
+export default function SearchBar({ query, onQueryChange, onSearch, isSearching }: Props) {
   return (
     <View style={styles.row}>
       <TextInput

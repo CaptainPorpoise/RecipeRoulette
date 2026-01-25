@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -26,18 +26,19 @@ import {
     listCategories,
     searchMealsByName,
 } from "../api/themealdb";
+import type { MealDetails, MealLite } from "../types/meal";
 
 import { loadFavIds, saveFavIds } from "../storage/favorites";
 
 const FILTER_RESULTS_LIMIT = 24;
 
-function intersectById(listA, listB) {
+function intersectById(listA: MealLite[], listB: MealLite[]) {
   const setB = new Set(listB.map((x) => x.idMeal));
   return listA.filter((x) => setB.has(x.idMeal));
 }
-function uniqById(list) {
-  const seen = new Set();
-  const out = [];
+function uniqById(list: MealLite[]) {
+  const seen = new Set<string>();
+  const out: MealLite[] = [];
   for (const x of list) {
     if (!seen.has(x.idMeal)) {
       seen.add(x.idMeal);
@@ -48,30 +49,30 @@ function uniqById(list) {
 }
 
 export default function HomeScreen() {
-  const [randomMeal, setRandomMeal] = useState(null);
+  const [randomMeal, setRandomMeal] = useState<MealDetails | null>(null);
   const [loadingRandom, setLoadingRandom] = useState(false);
   const [randomError, setRandomError] = useState("");
 
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<MealDetails[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [searchError, setSearchError] = useState("");
 
-  const [areas, setAreas] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedArea, setSelectedArea] = useState("ALL");
-  const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [areas, setAreas] = useState<string[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedArea, setSelectedArea] = useState<string>("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [filtersError, setFiltersError] = useState("");
 
-  const [favoriteIds, setFavoriteIds] = useState([]);
-  const [favoriteMeals, setFavoriteMeals] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [favoriteMeals, setFavoriteMeals] = useState<MealDetails[]>([]);
   const [loadingFavs, setLoadingFavs] = useState(false);
   const [favsError, setFavsError] = useState("");
 
   const [favoritesCollapsed, setFavoritesCollapsed] = useState(true);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedMeal, setSelectedMeal] = useState(null);
+  const [selectedMeal, setSelectedMeal] = useState<MealDetails | null>(null);
   const [loadingMeal, setLoadingMeal] = useState(false);
   const [mealError, setMealError] = useState("");
 
@@ -83,8 +84,8 @@ export default function HomeScreen() {
     try {
       const meal = await getRandomMeal();
       setRandomMeal(meal);
-    } catch (err) {
-      setRandomError(`Failed to fetch random recipe: ${err?.message || err}`);
+    } catch (err: any) {
+      setRandomError(`Failed to fetch random recipe: ${err?.message || String(err)}`);
     } finally {
       setLoadingRandom(false);
     }
@@ -96,18 +97,16 @@ export default function HomeScreen() {
       const [a, c] = await Promise.all([listAreas(), listCategories()]);
       setAreas(a);
       setCategories(c);
-    } catch (err) {
-      setFiltersError(`Failed to fetch filter lists (areas/categories): ${err?.message || err}`);
+    } catch (err: any) {
+      setFiltersError(`Failed to fetch filter lists: ${err?.message || String(err)}`);
     }
   }
 
-  async function loadFavoritesDetails(ids) {
+  async function loadFavoritesDetails(ids: string[]) {
     setLoadingFavs(true);
     setFavsError("");
     try {
-      const validIds = Array.isArray(ids)
-        ? ids.filter((x) => x !== null && x !== undefined && x !== "")
-        : [];
+      const validIds = (Array.isArray(ids) ? ids : []).filter((x) => x && String(x).trim());
 
       if (validIds.length === 0) {
         setFavoriteMeals([]);
@@ -116,13 +115,13 @@ export default function HomeScreen() {
 
       const settled = await Promise.allSettled(validIds.map((id) => getMealById(id)));
       const meals = settled
-        .map((r, i) => (r.status === "fulfilled" ? r.value : null))
-        .filter(Boolean);
+        .map((r) => (r.status === "fulfilled" ? r.value : null))
+        .filter(Boolean) as MealDetails[];
 
       setFavoriteMeals(meals);
       if (meals.length === 0) setFavsError("Failed to fetch favorites details.");
-    } catch (err) {
-      setFavsError(`Failed to fetch favorites details: ${err?.message || err}`);
+    } catch (err: any) {
+      setFavsError(`Failed to fetch favorites details: ${err?.message || String(err)}`);
       setFavoriteMeals([]);
     } finally {
       setLoadingFavs(false);
@@ -151,46 +150,48 @@ export default function HomeScreen() {
         return;
       }
 
-      let filtered = [];
+      let filteredLite: MealLite[] = [];
 
       if (areaActive && categoryActive) {
         const [byArea, byCat] = await Promise.all([
           filterMealsByArea(selectedArea),
           filterMealsByCategory(selectedCategory),
         ]);
-        filtered = intersectById(byArea, byCat);
+        filteredLite = intersectById(byArea, byCat);
       } else if (areaActive) {
-        filtered = await filterMealsByArea(selectedArea);
+        filteredLite = await filterMealsByArea(selectedArea);
       } else if (categoryActive) {
-        filtered = await filterMealsByCategory(selectedCategory);
+        filteredLite = await filterMealsByCategory(selectedCategory);
       }
 
-      filtered = uniqById(filtered);
+      filteredLite = uniqById(filteredLite);
 
-      if (filtered.length === 0) {
+      if (filteredLite.length === 0) {
         setResults([]);
         setSearchError("No results for selected filters.");
         return;
       }
 
-      const limited = filtered.slice(0, FILTER_RESULTS_LIMIT);
+      const limited = filteredLite.slice(0, FILTER_RESULTS_LIMIT);
       const detailed = await Promise.all(limited.map((m) => getMealById(m.idMeal)));
-      const mealsFull = detailed.filter(Boolean);
+      const mealsFull = detailed.filter(Boolean) as MealDetails[];
 
       setResults(mealsFull);
 
-      if (filtered.length > FILTER_RESULTS_LIMIT) {
-        setSearchError(`Found ${filtered.length} results. Showing first ${FILTER_RESULTS_LIMIT} (for performance).`);
+      if (filteredLite.length > FILTER_RESULTS_LIMIT) {
+        setSearchError(
+          `Found ${filteredLite.length} results. Showing first ${FILTER_RESULTS_LIMIT} (for performance).`
+        );
       }
-    } catch (err) {
-      setSearchError(`Failed to fetch results from the API: ${err?.message || err}`);
+    } catch (err: any) {
+      setSearchError(`Failed to fetch results from the API: ${err?.message || String(err)}`);
       setResults([]);
     } finally {
       setLoadingSearch(false);
     }
   }
 
-  async function openMeal(id) {
+  async function openMeal(id: string) {
     setModalOpen(true);
     setSelectedMeal(null);
     setLoadingMeal(true);
@@ -200,8 +201,8 @@ export default function HomeScreen() {
       const meal = await getMealById(id);
       if (!meal) setMealError("Recipe details not found.");
       else setSelectedMeal(meal);
-    } catch (err) {
-      setMealError(`Failed to fetch recipe details: ${err?.message || err}`);
+    } catch (err: any) {
+      setMealError(`Failed to fetch recipe details: ${err?.message || String(err)}`);
     } finally {
       setLoadingMeal(false);
     }
@@ -211,48 +212,39 @@ export default function HomeScreen() {
     setModalOpen(false);
   }
 
-  async function toggleFavorite(id) {
+  function toggleFavorite(id: string) {
     setFavoriteIds((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [id, ...prev];
-      // async zapis (bez blokowania UI)
       saveFavIds(next).catch(() => {});
       return next;
     });
   }
 
-  // init
   useEffect(() => {
     loadRandom();
     loadFilters();
     loadFavIds().then(setFavoriteIds).catch(() => setFavoriteIds([]));
   }, []);
 
-  // load favorite details whenever ids change
   useEffect(() => {
     loadFavoritesDetails(favoriteIds);
   }, [favoriteIds]);
 
-  // auto search when filters change and query is empty
   useEffect(() => {
     const q = query.trim();
     const areaActive = selectedArea !== "ALL";
     const categoryActive = selectedCategory !== "ALL";
-    if (!q && (areaActive || categoryActive)) {
-      doSearch();
-    }
+    if (!q && (areaActive || categoryActive)) doSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedArea, selectedCategory]);
 
-  // apply filters in-memory for query search results
   const filteredResults = useMemo(() => {
     const q = query.trim();
     if (!q) return results;
 
     let list = results;
     if (selectedArea !== "ALL") {
-      list = list.filter(
-        (m) => (m.strArea || "").toLowerCase() === selectedArea.toLowerCase()
-      );
+      list = list.filter((m) => (m.strArea || "").toLowerCase() === selectedArea.toLowerCase());
     }
     if (selectedCategory !== "ALL") {
       list = list.filter(
@@ -263,13 +255,12 @@ export default function HomeScreen() {
   }, [results, selectedArea, selectedCategory, query]);
 
   const filtersActive = selectedArea !== "ALL" || selectedCategory !== "ALL";
-  const resultsEmptyAfterFilter = query.trim() && results.length > 0 && filteredResults.length === 0;
+  const resultsEmptyAfterFilter =
+    query.trim().length > 0 && results.length > 0 && filteredResults.length === 0;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Recipe Roulette</Text>
           <Text style={styles.tagline}>Random recipe everyday</Text>
@@ -277,7 +268,6 @@ export default function HomeScreen() {
 
         {!!randomError && <Text style={styles.alert}>Error: {randomError}</Text>}
 
-        {/* Random recipe */}
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>Random recipe</Text>
 
@@ -293,10 +283,14 @@ export default function HomeScreen() {
               <Image source={{ uri: randomMeal.strMealThumb }} style={styles.randomImg} />
               <View style={{ flex: 1 }}>
                 <View style={styles.randomTitleRow}>
-                  <Text style={styles.randomTitle} numberOfLines={2}>{randomMeal.strMeal}</Text>
+                  <Text style={styles.randomTitle} numberOfLines={2}>
+                    {randomMeal.strMeal}
+                  </Text>
 
                   <Pressable onPress={() => toggleFavorite(randomMeal.idMeal)} style={styles.inlineFav}>
-                    <Text style={styles.inlineFavText}>{favSet.has(randomMeal.idMeal) ? "★" : "☆"}</Text>
+                    <Text style={styles.inlineFavText}>
+                      {favSet.has(randomMeal.idMeal) ? "★" : "☆"}
+                    </Text>
                   </Pressable>
                 </View>
 
@@ -311,7 +305,9 @@ export default function HomeScreen() {
                   </Pressable>
 
                   <Pressable onPress={loadRandom} style={styles.primaryBtn} disabled={loadingRandom}>
-                    <Text style={styles.primaryBtnText}>{loadingRandom ? "Loading..." : "Random recipe"}</Text>
+                    <Text style={styles.primaryBtnText}>
+                      {loadingRandom ? "Loading..." : "Random recipe"}
+                    </Text>
                   </Pressable>
                 </View>
               </View>
@@ -319,14 +315,10 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Favorites */}
         <View style={styles.panel}>
           <View style={styles.panelHeaderRow}>
             <Text style={styles.panelTitle}>Favorites</Text>
-            <Pressable
-              onPress={() => setFavoritesCollapsed((s) => !s)}
-              style={styles.ghostBtn}
-            >
+            <Pressable onPress={() => setFavoritesCollapsed((s) => !s)} style={styles.ghostBtn}>
               <Text style={styles.ghostBtnText}>{favoritesCollapsed ? "Expand" : "Collapse"}</Text>
             </Pressable>
           </View>
@@ -346,7 +338,6 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Collapsed: horizontal list, Expanded: grid */}
           {favoriteMeals.length > 0 && favoritesCollapsed && (
             <FlatList
               data={favoriteMeals}
@@ -390,7 +381,6 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Search */}
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>Search</Text>
 
@@ -407,15 +397,11 @@ export default function HomeScreen() {
             isSearching={loadingSearch}
           />
 
-          {/* Filters */}
           <View style={styles.filters}>
             <View style={styles.filterBox}>
               <Text style={styles.filterLabel}>Cuisine</Text>
               <View style={styles.pickerWrap}>
-                <Picker
-                  selectedValue={selectedArea}
-                  onValueChange={(v) => setSelectedArea(v)}
-                >
+                <Picker selectedValue={selectedArea} onValueChange={(v) => setSelectedArea(String(v))}>
                   <Picker.Item label="All" value="ALL" />
                   {areas.map((a) => (
                     <Picker.Item key={a} label={a} value={a} />
@@ -429,7 +415,7 @@ export default function HomeScreen() {
               <View style={styles.pickerWrap}>
                 <Picker
                   selectedValue={selectedCategory}
-                  onValueChange={(v) => setSelectedCategory(v)}
+                  onValueChange={(v) => setSelectedCategory(String(v))}
                 >
                   <Picker.Item label="All" value="ALL" />
                   {categories.map((c) => (
@@ -453,6 +439,7 @@ export default function HomeScreen() {
 
           {!!filtersError && <Text style={styles.hint}>{filtersError}</Text>}
           {!!searchError && <Text style={styles.hint}>{searchError}</Text>}
+
           {loadingSearch && (
             <View style={styles.loadingRow}>
               <ActivityIndicator />
@@ -488,9 +475,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        <Text style={styles.footer}>
-          Data: Recipe Roulette / TheMealDB API. App by Kacper Targoni
-        </Text>
+        <Text style={styles.footer}>Data: TheMealDB API. Recipe Roulette.</Text>
 
         <MealModal
           isOpen={modalOpen}
@@ -507,31 +492,17 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-  },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
   page: {
     paddingHorizontal: theme.spacing(2),
     paddingTop: theme.spacing(2),
     paddingBottom: theme.spacing(4),
     gap: theme.spacing(2),
   },
-  header: {
-    alignItems: "center",
-    marginBottom: theme.spacing(0.5),
-  },
-  title: {
-    color: theme.colors.textOnBg,
-    fontWeight: "900",
-    fontSize: 28,
-    letterSpacing: 0.2,
-  },
-  tagline: {
-    color: theme.colors.textOnBg,
-    opacity: 0.85,
-    marginTop: theme.spacing(0.5),
-  },
+  header: { alignItems: "center", marginBottom: theme.spacing(0.5) },
+  title: { color: theme.colors.textOnBg, fontWeight: "900", fontSize: 28, letterSpacing: 0.2 },
+  tagline: { color: theme.colors.textOnBg, opacity: 0.85, marginTop: theme.spacing(0.5) },
+
   panel: {
     backgroundColor: theme.colors.panel,
     borderRadius: theme.radius.lg,
@@ -539,54 +510,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  panelTitle: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "900",
-    fontSize: 16,
-    marginBottom: theme.spacing(1.25),
-  },
-  panelHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: theme.spacing(0.75),
-  },
-  alert: {
-    color: theme.colors.danger,
-    fontWeight: "700",
-    marginBottom: theme.spacing(1),
-  },
-  hint: {
-    color: theme.colors.muted,
-    marginTop: theme.spacing(0.75),
-  },
-  loadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  },
-  randomRow: {
-    flexDirection: "row",
-    gap: theme.spacing(1.5),
-    alignItems: "center",
-  },
-  randomImg: {
-    width: 92,
-    height: 92,
-    borderRadius: theme.radius.md,
-    backgroundColor: "#DDD",
-  },
-  randomTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing(1),
-  },
-  randomTitle: {
-    flex: 1,
-    color: theme.colors.textOnPanel,
-    fontWeight: "900",
-    fontSize: 16,
-  },
+  panelTitle: { color: theme.colors.textOnPanel, fontWeight: "900", fontSize: 16, marginBottom: theme.spacing(1.25) },
+  panelHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: theme.spacing(0.75) },
+
+  alert: { color: theme.colors.danger, fontWeight: "700", marginBottom: theme.spacing(1) },
+  hint: { color: theme.colors.muted, marginTop: theme.spacing(0.75) },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing(1) },
+
+  randomRow: { flexDirection: "row", gap: theme.spacing(1.5), alignItems: "center" },
+  randomImg: { width: 92, height: 92, borderRadius: theme.radius.md, backgroundColor: "#DDD" },
+  randomTitleRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing(1) },
+  randomTitle: { flex: 1, color: theme.colors.textOnPanel, fontWeight: "900", fontSize: 16 },
   inlineFav: {
     width: 38,
     height: 38,
@@ -597,25 +531,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  inlineFavText: {
-    fontSize: 18,
-    color: theme.colors.textOnPanel,
-    marginTop: -1,
-  },
-  metaLine: {
-    color: theme.colors.textOnPanel,
-    opacity: 0.9,
-    marginTop: theme.spacing(0.5),
-  },
-  metaStrong: {
-    fontWeight: "900",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: theme.spacing(1),
-    marginTop: theme.spacing(1.25),
-    flexWrap: "wrap",
-  },
+  inlineFavText: { fontSize: 18, color: theme.colors.textOnPanel, marginTop: -1 },
+  metaLine: { color: theme.colors.textOnPanel, opacity: 0.9, marginTop: theme.spacing(0.5) },
+  metaStrong: { fontWeight: "900" },
+
+  actionsRow: { flexDirection: "row", gap: theme.spacing(1), marginTop: theme.spacing(1.25), flexWrap: "wrap" },
   actionBtn: {
     backgroundColor: "rgba(255,255,255,0.85)",
     paddingHorizontal: theme.spacing(1.25),
@@ -624,10 +544,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  actionBtnText: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "700",
-  },
+  actionBtnText: { color: theme.colors.textOnPanel, fontWeight: "700" },
   primaryBtn: {
     backgroundColor: "rgba(216,160,138,0.35)",
     paddingHorizontal: theme.spacing(1.25),
@@ -636,10 +553,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  primaryBtnText: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "900",
-  },
+  primaryBtnText: { color: theme.colors.textOnPanel, fontWeight: "900" },
+
   ghostBtn: {
     backgroundColor: "rgba(255,255,255,0.75)",
     paddingHorizontal: theme.spacing(1.25),
@@ -648,21 +563,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  ghostBtnText: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "800",
-  },
-  filters: {
-    marginTop: theme.spacing(1.5),
-    gap: theme.spacing(1.25),
-  },
-  filterBox: {
-    gap: theme.spacing(0.5),
-  },
-  filterLabel: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "800",
-  },
+  ghostBtnText: { color: theme.colors.textOnPanel, fontWeight: "800" },
+
+  filters: { marginTop: theme.spacing(1.5), gap: theme.spacing(1.25) },
+  filterBox: { gap: theme.spacing(0.5) },
+  filterLabel: { color: theme.colors.textOnPanel, fontWeight: "800" },
   pickerWrap: {
     backgroundColor: theme.colors.white,
     borderRadius: theme.radius.md,
@@ -670,10 +575,6 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     overflow: "hidden",
   },
-  footer: {
-    textAlign: "center",
-    color: theme.colors.textOnBg,
-    opacity: 0.9,
-    marginTop: theme.spacing(1),
-  },
+
+  footer: { textAlign: "center", color: theme.colors.textOnBg, opacity: 0.9, marginTop: theme.spacing(1) },
 });

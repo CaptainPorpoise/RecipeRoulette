@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import {
     Image,
     Linking,
@@ -10,9 +10,10 @@ import {
     View,
 } from "react-native";
 import { theme } from "../theme/theme";
+import type { MealDetails } from "../types/meal";
 
-function extractIngredients(meal) {
-  const items = [];
+function extractIngredients(meal: MealDetails): string[] {
+  const items: string[] = [];
   for (let i = 1; i <= 20; i++) {
     const ing = meal?.[`strIngredient${i}`];
     const mea = meal?.[`strMeasure${i}`];
@@ -24,6 +25,16 @@ function extractIngredients(meal) {
   return items;
 }
 
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  meal: MealDetails | null;
+  isLoading: boolean;
+  error: string;
+  isFavorite: boolean;
+  onToggleFavorite: (id: string) => void;
+};
+
 export default function MealModal({
   isOpen,
   onClose,
@@ -32,14 +43,17 @@ export default function MealModal({
   error,
   isFavorite,
   onToggleFavorite,
-}) {
+}: Props) {
   const ingredients = useMemo(() => (meal ? extractIngredients(meal) : []), [meal]);
+
+  // Fix for TS: narrow optional strings to definite string before passing into Linking.openURL
+  const youtubeUrl = meal?.strYoutube;
+  const sourceUrl = meal?.strSource;
 
   return (
     <Modal visible={isOpen} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.modal} onPress={() => {}}>
-
           <View style={styles.header}>
             <Text style={styles.headerTitle} numberOfLines={1}>
               {isLoading ? "Loading..." : meal?.strMeal ?? "Details"}
@@ -73,7 +87,10 @@ export default function MealModal({
           )}
 
           {!isLoading && !!meal && (
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: theme.spacing(2) }}>
+            <ScrollView
+              style={styles.content}
+              contentContainerStyle={{ paddingBottom: theme.spacing(2) }}
+            >
               <View style={styles.top}>
                 <Image source={{ uri: meal.strMealThumb }} style={styles.modalImg} />
                 <View style={styles.meta}>
@@ -84,14 +101,14 @@ export default function MealModal({
                     <Text style={styles.metaStrong}>Category:</Text> {meal.strCategory || "-"}
                   </Text>
 
-                  {!!meal.strYoutube && (
-                    <Pressable onPress={() => Linking.openURL(meal.strYoutube)} style={styles.linkBtn}>
+                  {typeof youtubeUrl === "string" && youtubeUrl.trim().length > 0 && (
+                    <Pressable onPress={() => Linking.openURL(youtubeUrl)} style={styles.linkBtn}>
                       <Text style={styles.linkText}>Open YouTube</Text>
                     </Pressable>
                   )}
 
-                  {!!meal.strSource && (
-                    <Pressable onPress={() => Linking.openURL(meal.strSource)} style={styles.linkBtn}>
+                  {typeof sourceUrl === "string" && sourceUrl.trim().length > 0 && (
+                    <Pressable onPress={() => Linking.openURL(sourceUrl)} style={styles.linkBtn}>
                       <Text style={styles.linkText}>Open source link</Text>
                     </Pressable>
                   )}
@@ -101,13 +118,15 @@ export default function MealModal({
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Ingredients</Text>
                 {ingredients.map((x) => (
-                  <Text key={x} style={styles.listItem}>• {x}</Text>
+                  <Text key={x} style={styles.listItem}>
+                    • {x}
+                  </Text>
                 ))}
               </View>
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Instructions</Text>
-                <Text style={styles.instructions}>{meal.strInstructions}</Text>
+                <Text style={styles.instructions}>{meal.strInstructions || "-"}</Text>
               </View>
             </ScrollView>
           )}
@@ -173,20 +192,10 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     fontWeight: "600",
   },
-  skeleton: {
-    padding: theme.spacing(2),
-  },
-  skeletonText: {
-    color: theme.colors.muted,
-  },
-  content: {
-    paddingHorizontal: theme.spacing(1.5),
-    paddingTop: theme.spacing(1.5),
-  },
-  top: {
-    flexDirection: "row",
-    gap: theme.spacing(1.25),
-  },
+  skeleton: { padding: theme.spacing(2) },
+  skeletonText: { color: theme.colors.muted },
+  content: { paddingHorizontal: theme.spacing(1.5), paddingTop: theme.spacing(1.5) },
+  top: { flexDirection: "row", gap: theme.spacing(1.25) },
   modalImg: {
     width: 120,
     height: 120,
@@ -194,12 +203,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#DDD",
   },
   meta: { flex: 1, gap: theme.spacing(0.75) },
-  metaLine: {
-    color: theme.colors.textOnPanel,
-  },
-  metaStrong: {
-    fontWeight: "800",
-  },
+  metaLine: { color: theme.colors.textOnPanel },
+  metaStrong: { fontWeight: "800" },
   linkBtn: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(216,160,138,0.25)",
@@ -209,25 +214,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  linkText: {
-    color: theme.colors.textOnPanel,
-    fontWeight: "700",
-  },
-  section: {
-    marginTop: theme.spacing(2),
-  },
+  linkText: { color: theme.colors.textOnPanel, fontWeight: "700" },
+  section: { marginTop: theme.spacing(2) },
   sectionTitle: {
     color: theme.colors.textOnPanel,
     fontWeight: "900",
     fontSize: 15,
     marginBottom: theme.spacing(1),
   },
-  listItem: {
-    color: theme.colors.textOnPanel,
-    marginBottom: theme.spacing(0.5),
-  },
-  instructions: {
-    color: theme.colors.textOnPanel,
-    lineHeight: 20,
-  },
+  listItem: { color: theme.colors.textOnPanel, marginBottom: theme.spacing(0.5) },
+  instructions: { color: theme.colors.textOnPanel, lineHeight: 20 },
 });
