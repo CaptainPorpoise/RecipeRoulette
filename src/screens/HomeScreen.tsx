@@ -261,8 +261,13 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
+        {/* HEADER WITH BANNER */}
         <View style={styles.header}>
-          <Text style={styles.title}>Recipe Roulette</Text>
+          <Image
+            source={require("../../assets/banner.png")}
+            style={styles.banner}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Random recipe everyday</Text>
         </View>
 
@@ -499,9 +504,20 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing(4),
     gap: theme.spacing(2),
   },
-  header: { alignItems: "center", marginBottom: theme.spacing(0.5) },
-  title: { color: theme.colors.textOnBg, fontWeight: "900", fontSize: 28, letterSpacing: 0.2 },
-  tagline: { color: theme.colors.textOnBg, opacity: 0.85, marginTop: theme.spacing(0.5) },
+
+  header: {
+    alignItems: "center",
+    marginBottom: theme.spacing(0.5),
+  },
+  banner: {
+    width: "100%",
+    height: 110,
+  },
+  tagline: {
+    color: theme.colors.textOnBg,
+    opacity: 0.85,
+    marginTop: theme.spacing(0.75),
+  },
 
   panel: {
     backgroundColor: theme.colors.panel,
@@ -510,8 +526,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  panelTitle: { color: theme.colors.textOnPanel, fontWeight: "900", fontSize: 16, marginBottom: theme.spacing(1.25) },
-  panelHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: theme.spacing(0.75) },
+  panelTitle: {
+    color: theme.colors.textOnPanel,
+    fontWeight: "900",
+    fontSize: 16,
+    marginBottom: theme.spacing(1.25),
+  },
+  panelHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing(0.75),
+  },
 
   alert: { color: theme.colors.danger, fontWeight: "700", marginBottom: theme.spacing(1) },
   hint: { color: theme.colors.muted, marginTop: theme.spacing(0.75) },
